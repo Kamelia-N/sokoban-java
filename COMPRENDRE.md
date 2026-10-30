@@ -235,6 +235,8 @@ Lors de notre prochaine explication, nous pouvons prendre une seule méthode et 
 
 Avant chaque déplacement réussi, `memoriserMouvement()` enregistre la position du joueur et des caisses.
 Ce petit instantané est ajouté à un tableau de textes appelé `historique`.
+`encoderEtat()` le crée ; `restaurerEtat()` permet de rétablir les positions enregistrées.
+Chaque caractère représente une case, dans l'ordre des lignes.
 
 `annulerMouvement()` retire le dernier instantané, restaure les positions et diminue le compteur.
 C'est une **pile** : le dernier mouvement effectué est le premier annulé.
@@ -242,9 +244,3 @@ Un mouvement refusé n'est pas mémorisé. Recommencer le niveau vide l'historiq
 
 **Exercice :** au niveau 2, fais un déplacement puis une poussée. Tape u deux fois.
 Vérifie les caisses, le joueur et le compteur. Tape u une troisième fois : aucune annulation ne doit être possible.
-
-## Étape 10 — Passer aux solveurs
-
-Une fois les déplacements compris, ouvre **ALGORITHMES.md**.
-Les solveurs réutilisent les mêmes règles, mais testent de nombreuses positions sans déplacer le joueur à l'écran.
-La lecture pas à pas permet ensuite de voir la solution dans le vrai jeu.

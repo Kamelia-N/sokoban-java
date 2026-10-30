@@ -1,7 +1,7 @@
 import java.util.Scanner;
 
 /**
- * Projet Sokoban - parties standard et avancee, en console.
+ * Projet Sokoban - partie standard, en console.
  * Le terrain (murs/objectifs) et les caisses sont memorises separement.
  * Ainsi, un objectif reste present quand le joueur ou une caisse le recouvre.
  */
@@ -53,6 +53,10 @@ public class Sokoban {
     static int mouvements;
     static int niveauChoisi = 0; // Indice 0 = niveau affiche comme "Niveau 1".
 
+    // Photographies des positions precedentes pour annuler les mouvements.
+    static String[] historique;
+    static int tailleHistorique;
+
     // Un seul lecteur pour toutes les saisies du programme.
     static final Scanner CLAVIER = new Scanner(System.in);
 
@@ -70,20 +74,14 @@ public class Sokoban {
                     choisirNiveau();
                     break;
                 case "3":
-                    resoudreAutomatiquement();
-                    break;
-                case "4":
-                    comparerAlgorithmes();
-                    break;
-                case "5":
                     afficherRegles();
                     break;
-                case "6":
+                case "4":
                 case "x":
                     continuer = false;
                     break;
                 default:
-                    System.out.println("Choix invalide : entre un chiffre de 1 a 6.");
+                    System.out.println("Choix invalide : entre 1, 2, 3 ou 4.");
             }
         }
         System.out.println("A bientot !");
@@ -94,10 +92,8 @@ public class Sokoban {
         System.out.println("Niveau selectionne : " + (niveauChoisi + 1));
         System.out.println("1. Jouer au niveau selectionne");
         System.out.println("2. Choisir un niveau");
-        System.out.println("3. Resoudre automatiquement (DFS ou BFS)");
-        System.out.println("4. Comparer DFS et BFS");
-        System.out.println("5. Lire les regles");
-        System.out.println("6. Quitter");
+        System.out.println("3. Lire les regles");
+        System.out.println("4. Quitter");
         System.out.print("Ton choix : ");
     }
 
@@ -321,34 +317,7 @@ public class Sokoban {
         }
     }
 
-    // ===== PARTIE AVANCEE : un etat est une photographie du jeu =====
-    // Le terrain fixe reste commun. Le texte contient seulement @, $ et des espaces.
-    // Deux caisses ne portent pas de numero : permuter deux caisses ne cree pas un etat different.
-    static final char[] TOUCHES = {'z', 's', 'q', 'd'};
-    static final int[] DELTA_LIGNES = {-1, 1, 0, 0};
-    static final int[] DELTA_COLONNES = {0, 0, -1, 1};
-    static final int MAX_ETATS = 100_000;
-    static int limiteEtats = MAX_ETATS;
-
-    // Toutes les structures de recherche sont implementees avec des tableaux.
-    static String[] etatsRecherche;
-    static int[] parentsRecherche;
-    static char[] coupsRecherche;
-    static int[] frontiere;
-    static int[] visites;
-    static int nombreEtats;
-    static int debutFrontiere;
-    static int finFrontiere;
-    static int etatsExplores;
-    static int etatsBloques;
-    static boolean limiteAtteinte;
-    static double tempsMillisecondes;
-    static String statutRecherche;
-
-    // Historique pour le bonus "annuler le dernier mouvement".
-    static String[] historique;
-    static int tailleHistorique;
-
+    // Une photographie des positions : un caractere par case, ligne apres ligne.
     public static String encoderEtat() {
         int largeur = terrain[0].length;
         char[] contenu = new char[terrain.length * largeur];
@@ -361,6 +330,7 @@ public class Sokoban {
         return new String(contenu);
     }
 
+    // Retablit une photographie sans changer le terrain (murs et objectifs).
     public static void restaurerEtat(String etat) {
         int largeur = terrain[0].length;
         for (int ligne = 0; ligne < terrain.length; ligne++) {
@@ -375,6 +345,7 @@ public class Sokoban {
         }
     }
 
+    // Sauvegarde les positions avant un mouvement pour pouvoir l'annuler.
     public static void memoriserMouvement() {
         if (tailleHistorique == historique.length) {
             String[] agrandi = new String[historique.length * 2];
@@ -384,6 +355,7 @@ public class Sokoban {
         historique[tailleHistorique++] = encoderEtat();
     }
 
+    // Retrouve la derniere photographie et retire un mouvement au compteur.
     public static boolean annulerMouvement() {
         if (tailleHistorique == 0) {
             return false;
@@ -394,52 +366,12 @@ public class Sokoban {
         return true;
     }
 
-    // Calcule un voisin SANS modifier la vraie partie. null = mouvement impossible.
-    public static String etatSuivant(String etat, int direction) {
-        int largeur = terrain[0].length;
-        int position = etat.indexOf('@');
-        int ligne = position / largeur;
-        int colonne = position % largeur;
-        int prochaineLigne = ligne + DELTA_LIGNES[direction];
-        int prochaineColonne = colonne + DELTA_COLONNES[direction];
-        if (!dansGrille(prochaineLigne, prochaineColonne)
-                || terrain[prochaineLigne][prochaineColonne] == '#') {
-            return null;
-        }
-        int prochainePosition = prochaineLigne * largeur + prochaineColonne;
-        char[] contenu = etat.toCharArray();
-        if (contenu[prochainePosition] == '$') {
-            int derriereLigne = prochaineLigne + DELTA_LIGNES[direction];
-            int derriereColonne = prochaineColonne + DELTA_COLONNES[direction];
-            if (!dansGrille(derriereLigne, derriereColonne)
-                    || terrain[derriereLigne][derriereColonne] == '#'
-                    || contenu[derriereLigne * largeur + derriereColonne] == '$') {
-                return null;
-            }
-            contenu[derriereLigne * largeur + derriereColonne] = '$';
-        }
-        contenu[position] = ' ';
-        contenu[prochainePosition] = '@';
-        return new String(contenu);
-    }
-
-    public static boolean etatGagnant(String etat) {
-        int largeur = terrain[0].length;
-        for (int position = 0; position < etat.length(); position++) {
-            if (etat.charAt(position) == '$'
-                    && terrain[position / largeur][position % largeur] != '.') {
-                return false;
-            }
-        }
-        return true;
-    }
-
+    // Les murs et les bords peuvent empecher une caisse de sortir d'un coin.
     public static boolean murOuBord(int ligne, int colonne) {
         return !dansGrille(ligne, colonne) || terrain[ligne][colonne] == '#';
     }
 
-    // Bonus : une caisse hors objectif coincee entre deux murs perpendiculaires
-    // ne peut plus etre poussee hors du coin. Les autres blocages ne sont pas detectes.
+    // Signale une caisse dans un coin hors objectif. Ne detecte pas tous les blocages.
     public static boolean etatBloque(String etat) {
         int largeur = terrain[0].length;
         for (int position = 0; position < etat.length(); position++) {
@@ -459,231 +391,4 @@ public class Sokoban {
         }
         return false;
     }
-
-    // File FIFO et pile LIFO partagent un tableau mais retirent a des endroits differents.
-    // BFS : lire au debut. DFS : retirer a la fin. Ajout toujours a la fin.
-    public static String resoudreBFS() {
-        return rechercher(true);
-    }
-
-    public static String resoudreDFS() {
-        return rechercher(false);
-    }
-
-    public static String rechercher(boolean largeur) {
-        long debutTemps = System.nanoTime();
-        int capacite = Math.min(1024, limiteEtats);
-        if (capacite < 1) {
-            throw new IllegalArgumentException("La limite de recherche doit etre positive.");
-        }
-        etatsRecherche = new String[capacite];
-        parentsRecherche = new int[capacite];
-        coupsRecherche = new char[capacite];
-        frontiere = new int[capacite];
-        // Au moins deux cases de hachage par etat : on garde des emplacements libres.
-        int capaciteVisites = 1;
-        while (capaciteVisites < limiteEtats * 2) {
-            capaciteVisites *= 2;
-        }
-        visites = new int[capaciteVisites];
-        nombreEtats = 0;
-        debutFrontiere = 0;
-        finFrontiere = 0;
-        etatsExplores = 0;
-        etatsBloques = 0;
-        limiteAtteinte = false;
-        statutRecherche = "IMPOSSIBLE";
-        String solution = null;
-        enregistrerEtat(encoderEtat(), -1, ' ');
-
-        while (debutFrontiere < finFrontiere && !limiteAtteinte) {
-            int indice;
-            if (largeur) {
-                indice = frontiere[debutFrontiere++]; // FIFO : premier entre, premier sorti.
-            } else {
-                indice = frontiere[--finFrontiere]; // LIFO : dernier entre, premier sorti.
-            }
-            String etat = etatsRecherche[indice];
-            etatsExplores++;
-            // Cas d'arret reussi : l'etat retire est une victoire.
-            if (etatGagnant(etat)) {
-                solution = reconstruireSolution(indice);
-                statutRecherche = "TROUVEE";
-                break;
-            }
-            if (etatBloque(etat)) {
-                etatsBloques++;
-                continue;
-            }
-            for (int i = 0; i < TOUCHES.length; i++) {
-                // Une pile inverse l'ordre : inserer d,q,s,z fait explorer z en premier.
-                int direction = largeur ? i : TOUCHES.length - 1 - i;
-                String voisin = etatSuivant(etat, direction);
-                if (voisin == null) {
-                    continue;
-                }
-                if (etatBloque(voisin)) {
-                    etatsBloques++;
-                    continue;
-                }
-                enregistrerEtat(voisin, indice, TOUCHES[direction]);
-                if (limiteAtteinte) {
-                    break;
-                }
-            }
-        }
-        if (limiteAtteinte && solution == null) {
-            statutRecherche = "LIMITE"; // Ce n'est PAS une preuve d'absence de solution.
-        }
-        tempsMillisecondes = (System.nanoTime() - debutTemps) / 1_000_000.0;
-        return solution;
-    }
-
-    // Table de hachage maison, sans HashMap/HashSet : collisions par sondage lineaire.
-    // Une case vaut 0 si libre, sinon indice de l'etat + 1.
-    // On compare aussi le texte entier : deux hash identiques ne suffisent pas.
-    public static void enregistrerEtat(String etat, int parent, char coup) {
-        int caseTable = (etat.hashCode() & 0x7fffffff) % visites.length;
-        while (visites[caseTable] != 0) {
-            int indiceExistant = visites[caseTable] - 1;
-            if (etatsRecherche[indiceExistant].equals(etat)) {
-                return; // Deja decouvert : ne pas l'ajouter une seconde fois.
-            }
-            caseTable = (caseTable + 1) % visites.length;
-        }
-        if (nombreEtats == limiteEtats) {
-            limiteAtteinte = true;
-            return;
-        }
-        if (nombreEtats == etatsRecherche.length) {
-            agrandirRecherche();
-        }
-        int indice = nombreEtats++;
-        etatsRecherche[indice] = etat;
-        parentsRecherche[indice] = parent;
-        coupsRecherche[indice] = coup;
-        visites[caseTable] = indice + 1;
-        frontiere[finFrontiere++] = indice;
-    }
-
-    public static void agrandirRecherche() {
-        int capacite = Math.min(etatsRecherche.length * 2, limiteEtats);
-        String[] nouveauxEtats = new String[capacite];
-        int[] nouveauxParents = new int[capacite];
-        char[] nouveauxCoups = new char[capacite];
-        int[] nouvelleFrontiere = new int[capacite];
-        System.arraycopy(etatsRecherche, 0, nouveauxEtats, 0, nombreEtats);
-        System.arraycopy(parentsRecherche, 0, nouveauxParents, 0, nombreEtats);
-        System.arraycopy(coupsRecherche, 0, nouveauxCoups, 0, nombreEtats);
-        System.arraycopy(frontiere, 0, nouvelleFrontiere, 0, finFrontiere);
-        etatsRecherche = nouveauxEtats;
-        parentsRecherche = nouveauxParents;
-        coupsRecherche = nouveauxCoups;
-        frontiere = nouvelleFrontiere;
-    }
-
-    // On remonte du but vers le depart grace aux indices parents, puis on remplit a l'envers.
-    public static String reconstruireSolution(int indice) {
-        int longueur = 0;
-        for (int courant = indice; parentsRecherche[courant] != -1; courant = parentsRecherche[courant]) {
-            longueur++;
-        }
-        char[] chemin = new char[longueur];
-        int courant = indice;
-        for (int position = longueur - 1; position >= 0; position--) {
-            chemin[position] = coupsRecherche[courant];
-            courant = parentsRecherche[courant];
-        }
-        return new String(chemin);
-    }
-
-    public static void afficherResultat(String algorithme, String solution) {
-        System.out.println("\n--- " + algorithme + " ---");
-        if (solution != null) {
-            System.out.println("Solution trouvee : oui");
-            System.out.println("Mouvements : " + solution.length());
-        } else if (statutRecherche.equals("LIMITE")) {
-            System.out.println("Recherche interrompue : limite de " + limiteEtats + " etats decouverts.");
-            System.out.println("Existence d'une solution : indeterminee.");
-        } else {
-            System.out.println("Solution trouvee : non (recherche terminee)");
-        }
-        System.out.println("Etats explores (retires de la file/pile) : " + etatsExplores);
-        System.out.println("Etats decouverts (uniques memorises) : " + nombreEtats);
-        System.out.println("Configurations bloquees ecartees (avec repetitions possibles) : " + etatsBloques);
-        System.out.printf(java.util.Locale.ROOT, "Temps : %.3f ms%n", tempsMillisecondes);
-    }
-
-    public static void resoudreAutomatiquement() {
-        System.out.print("\n1. DFS (profondeur) | 2. BFS (largeur) | x. Retour : ");
-        String choix = lireCommande();
-        if (choix.equals("x")) {
-            return;
-        }
-        if (!choix.equals("1") && !choix.equals("2")) {
-            System.out.println("Choix invalide : 1, 2 ou x.");
-            return;
-        }
-        chargerNiveau(niveauChoisi);
-        boolean largeur = choix.equals("2");
-        String solution = largeur ? resoudreBFS() : resoudreDFS();
-        afficherResultat(largeur ? "BFS" : "DFS", solution);
-        if (solution == null) {
-            return;
-        }
-        System.out.println("Solution a jouer (z : haut, s : bas, q : gauche, d : droite) :");
-        if (solution.isEmpty()) {
-            System.out.println("Aucun mouvement : le niveau est deja resolu.");
-        }
-        for (int i = 0; i < solution.length(); i += 70) {
-            System.out.println(solution.substring(i, Math.min(i + 70, solution.length())));
-        }
-        System.out.print("v : voir la solution pas a pas | x : menu : ");
-        if (lireCommande().equals("v")) {
-            rejouerSolution(solution);
-        }
-    }
-
-    public static void rejouerSolution(String solution) {
-        afficherGrille();
-        for (int i = 0; i < solution.length(); i++) {
-            System.out.print("Etape " + (i + 1) + "/" + solution.length()
-                + " : " + solution.charAt(i) + " | Entree : avancer, x : menu : ");
-            String choix = lireCommande();
-            if (choix.equals("x")) {
-                return;
-            }
-            if (!choix.isEmpty()) {
-                System.out.println("Appuie sur Entree ou tape x.");
-                i--;
-                continue;
-            }
-            int direction = 0;
-            while (TOUCHES[direction] != solution.charAt(i)) {
-                direction++;
-            }
-            if (!deplacerJoueur(DELTA_LIGNES[direction], DELTA_COLONNES[direction])) {
-                throw new IllegalStateException("La solution contient un mouvement impossible.");
-            }
-            afficherGrille();
-        }
-        if (partieTerminee()) {
-            System.out.println("Victoire ! Solution rejouee en " + mouvements + " mouvements.");
-        }
-    }
-
-    public static void comparerAlgorithmes() {
-        chargerNiveau(niveauChoisi);
-        System.out.println("\n========== COMPARAISON : NIVEAU " + (niveauChoisi + 1) + " ==========");
-        System.out.println("Meme depart, memes regles et meme detection des coins bloques.");
-        String dfs = resoudreDFS();
-        afficherResultat("DFS", dfs);
-        String bfs = resoudreBFS();
-        afficherResultat("BFS", bfs);
-        System.out.println("\nDFS explore une branche en profondeur : sa solution peut etre longue.");
-        System.out.println("BFS explore par nombre de mouvements croissant.");
-        System.out.println("Si BFS trouve une solution, elle minimise le nombre de deplacements, poussees comprises.");
-        System.out.println("Les temps varient selon la machine et l'echauffement de Java.");
-    }
-
 }
