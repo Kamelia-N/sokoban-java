@@ -1,4 +1,4 @@
-# Sokoban Java — ton premier projet complet
+# Sokoban Java
 
 Un jeu de réflexion en console, avec les parties standard et avancée du projet ESIEA.
 Le code utilise une seule classe Java, des tableaux et la bibliothèque standard.
